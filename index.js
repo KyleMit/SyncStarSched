@@ -1,5 +1,6 @@
 const fs = require('fs');
 const readline = require('readline');
+const moment = require('moment');
 const { google } = require('googleapis');
 const puppeteer = require('puppeteer');
 const config = require('./config.json');
@@ -43,7 +44,7 @@ async function getOAuthClient() {
 
 async function scrapeSite() {
     // open browse and navigate to page
-    const browser = await puppeteer.launch({headless: false});
+    const browser = await puppeteer.launch({headless: true, devtools: false}); // update config in prod
     const page = await browser.newPage();
     await page.goto(config.urls.starbucks);
 
@@ -80,7 +81,9 @@ async function scrapeSite() {
 
     // go hunting for info we want
     var webShifts = await page.evaluate(() => {
-       var shifts = $(".scheduleShift").map(function() {
+
+        // executes on client in browser
+        var shifts = $(".scheduleShift").map(function() {
             var $this = $(this)
             var $store = $this.find(".scheduleShiftStore");
             var $time = $this.find(".scheduleShiftTime");
@@ -107,13 +110,11 @@ async function scrapeSite() {
          return shifts;
     })
 
-    console.log(webShifts)
 
-    /*
-        STEP 6 - Closing Time
-    */
-    // sleep for awhile then close
-    //await page.waitFor(1000 * 20)
+    console.log(`Retrieved ${webShifts.length} shift(s) from Starbucks:`)
+    console.log((JSON.stringify(webShifts, null, 4)))
+
+    // Closing Time
     await browser.close();
 
     return webShifts
@@ -147,20 +148,10 @@ async function getPageStatus(myPage) {
 
 async function syncSchedule(auth, schedule) {
     
-
-
     // init google api library
     const calendar = google.calendar({ version: 'v3', auth });
 
-    // calendar name we want
-    const calendarName = "Starbucks"
-
-    // call all active calendars to look for this one
-    const calRes = await calendar.calendarList.list({})
-    const calendars = calRes.data.items;
-    const myCal = calendars.filter(cal => cal.summary == calendarName)[0];
-    const calendarId = myCal.id; // "60m640rj25mngq7m57j0hbg518@group.calendar.google.com"
-
+    const calendarId = await getCalendarId(calendar, "Starbucks")
 
     // check current events
     const eventsRes = await calendar.events.list({
@@ -171,29 +162,27 @@ async function syncSchedule(auth, schedule) {
         orderBy: 'startTime',
     })
     
-    const events = eventsRes.data.items;
+    const upcomingEvents = eventsRes.data.items;
 
     // log events for fun
-    if (events.length) {
-        console.log('Upcoming 10 events:');
-        events.map((event, i) => {
+    if (upcomingEvents.length) {
+        console.log(`Retrieved ${upcomingEvents.length} upcoming calendar appointment(s):`)
+        upcomingEvents.map((event, i) => {
             const start = event.start.dateTime || event.start.date;
             console.log(`${start} - ${event.summary}`);
         });
     }
 
-    // insert one event
-
-    var event = {  
+    const defaultEvent = {  
         'summary': 'Starbucks Shift',
         'location': '49 Church St #2072, Burlington, VT 05401',
         'description': 'Automatically added from https://mysite.starbucks.com/MySchedule/Schedule.aspx.',
         'start': {
-          'dateTime': '2018-12-30T12:00:00-05:00',
+          'dateTime': '2019-01-01T12:00:00-05:00',
           'timeZone': 'America/New_York'
         },
         'end': {
-          'dateTime': '2018-12-30T17:00:00-05:00',
+          'dateTime': '2019-01-01T17:00:00-05:00',
           'timeZone': 'America/New_York'
         },
         'reminders': {
@@ -206,13 +195,65 @@ async function syncSchedule(auth, schedule) {
         }
     }
 
-    // const insertRes = await calendar.events.insert({
-    //     calendarId: calendarId,
-    //     requestBody: event,
-    // })
+
+    for (let i=0; i < schedule.length; i++) {
+        const shift = schedule[i];
+
+        // upcoming shift year is current execution year unless we're in dec and shift is in jan
+        shift.year = (new Date()).getFullYear()
+        if (new Date().getMonth() == 11 && shift.day.includes("Jan")) shift.year++
+
+        shift.startDateTime = `${shift.day.split(",")[1]} ${shift.year}, ${shift.shiftStart}`
+        shift.endDateTime = `${shift.day.split(",")[1]} ${shift.year}, ${shift.shiftEnd}`
+        shift.startMoment = moment(shift.startDateTime, "MMMM D YYYY, hh:mm A")
+        shift.endMoment = moment(shift.endDateTime, "MMMM D YYYY, hh:mm A")
+
+        var matchedEvent = upcomingEvents.filter(evt => {
+            return moment(evt.start.dateTime).format() == shift.startMoment.format() &&
+                   moment(evt.end.dateTime).format() == shift.endMoment.format()
+        })
+
+        shift.isNew = matchedEvent.length == 0
+
+
+        if (shift.isNew) {
+
+            let insertShift = Object.assign({}, defaultEvent)
+            insertShift.start.dateTime = shift.startMoment.format()
+            insertShift.end.dateTime = shift.endMoment.format()
+
+            let insertRes = await calendar.events.insert({
+                calendarId: calendarId,
+                requestBody: insertShift,
+            })
+
+        }
+    }
+
+
+    // insert one event
+    var sampleShift = {
+        "storeNumber": "007629",
+        "storeName": "Burlington Town Center",
+        "day": "Friday, January 11",
+        "shiftStart": "12:30 PM",
+        "shiftEnd": "06:00 PM"
+    }
+ 
 
 
 
+}
+
+async function getCalendarId(calendar, calendarName) {
+
+    // call all active calendars to look for this one
+    const calRes = await calendar.calendarList.list({})
+    const calendars = calRes.data.items;
+    const myCal = calendars.filter(cal => cal.summary == calendarName)[0];
+    const calendarId = myCal.id; // "60m640rj25mngq7m57j0hbg518@group.calendar.google.com"
+
+    return calendarId;
 }
 
 /**

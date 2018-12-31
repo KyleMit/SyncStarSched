@@ -8,6 +8,7 @@
   "license": "MIT",
   "dependencies": {
     "googleapis": "^36.0.0",
+    "moment": "^2.23.0",
     "puppeteer": "^1.11.0"
   }
 }
