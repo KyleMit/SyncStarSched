@@ -110,9 +110,18 @@ async function scrapeSite() {
          return shifts;
     })
 
+    // var sampleShift = {
+    //     "storeNumber": "007629",
+    //     "storeName": "Burlington Town Center",
+    //     "day": "Friday, January 11",
+    //     "shiftStart": "12:30 PM",
+    //     "shiftEnd": "06:00 PM"
+    // }
 
     console.log(`Retrieved ${webShifts.length} shift(s) from Starbucks:`)
-    console.log((JSON.stringify(webShifts, null, 4)))
+    webShifts.forEach(shift => {
+        console.log(`Shift: ${shift.day}, ${shift.shiftStart}`);
+    });
 
     // Closing Time
     await browser.close();
@@ -122,29 +131,25 @@ async function scrapeSite() {
 
 // determine what page we're on
 async function getPageStatus(myPage) {
-        return await myPage.evaluate(() => {
-                
-            const partner = document.querySelectorAll(".txtUserid")
-            const passBox = document.querySelectorAll("input.tbxPassword")
-            const secQuestion = document.querySelector(".bodytext.lblKBQ.lblKBQ1")
-            const schedule = document.querySelectorAll(".scheduleShift")
-
-            //console.log('hi')
-            console.log(schedule,passBox,secQuestion)
-
-            var status = {
-                partnerPage: partner.length > 0,
-                schedulePage: schedule.length > 0,
-                passwordPage: passBox.length > 0,
-                securityPage: !!secQuestion,
-                securityQuestion: secQuestion ? secQuestion.innerText : ""
-            }
-
-            return status;
-
+    return await myPage.evaluate(() => {
             
-        })
-    }
+        const partner = document.querySelectorAll(".txtUserid")
+        const passBox = document.querySelectorAll("input.tbxPassword")
+        const secQuestion = document.querySelector(".bodytext.lblKBQ.lblKBQ1")
+        const schedule = document.querySelectorAll(".scheduleShift")
+
+        var status = {
+            partnerPage: partner.length > 0,
+            schedulePage: schedule.length > 0,
+            passwordPage: passBox.length > 0,
+            securityPage: !!secQuestion,
+            securityQuestion: secQuestion ? secQuestion.innerText : ""
+        }
+
+        return status;
+
+    })
+}
 
 async function syncSchedule(auth, schedule) {
     
@@ -167,9 +172,9 @@ async function syncSchedule(auth, schedule) {
     // log events for fun
     if (upcomingEvents.length) {
         console.log(`Retrieved ${upcomingEvents.length} upcoming calendar appointment(s):`)
-        upcomingEvents.map((event, i) => {
+        upcomingEvents.forEach(event => {
             const start = event.start.dateTime || event.start.date;
-            console.log(`${start} - ${event.summary}`);
+            console.log(`Event: ${start} - ${event.summary}`);
         });
     }
 
@@ -207,41 +212,50 @@ async function syncSchedule(auth, schedule) {
         shift.endDateTime = `${shift.day.split(",")[1]} ${shift.year}, ${shift.shiftEnd}`
         shift.startMoment = moment(shift.startDateTime, "MMMM D YYYY, hh:mm A")
         shift.endMoment = moment(shift.endDateTime, "MMMM D YYYY, hh:mm A")
+        shift.duration = moment.duration(shift.endMoment.diff(shift.startMoment));
 
-        var matchedEvent = upcomingEvents.filter(evt => {
+        var matchedEvent = upcomingEvents.some(evt => {
             return moment(evt.start.dateTime).format() == shift.startMoment.format() &&
                    moment(evt.end.dateTime).format() == shift.endMoment.format()
         })
 
-        shift.isNew = matchedEvent.length == 0
-
+        shift.isNew = !matchedEvent
 
         if (shift.isNew) {
 
             let insertShift = Object.assign({}, defaultEvent)
             insertShift.start.dateTime = shift.startMoment.format()
             insertShift.end.dateTime = shift.endMoment.format()
+            insertShift.summary = `(${shift.duration.asHours()}HR) Starbucks`
+            insertShift.location = `${shift.storeName} - #${shift.storeNumber}`
 
             let insertRes = await calendar.events.insert({
                 calendarId: calendarId,
                 requestBody: insertShift,
             })
 
+            // todo - send update if requested
         }
     }
 
+    // todo: delete events
+    for (let i = 0; i < upcomingEvents.length; i++) {
+        const evt = upcomingEvents[i];
+        
+        var matchedShift = schedule.some(shift => {
+            return moment(evt.start.dateTime).format() == shift.startMoment.format() &&
+                   moment(evt.end.dateTime).format() == shift.endMoment.format()
+        })
 
-    // insert one event
-    var sampleShift = {
-        "storeNumber": "007629",
-        "storeName": "Burlington Town Center",
-        "day": "Friday, January 11",
-        "shiftStart": "12:30 PM",
-        "shiftEnd": "06:00 PM"
+        const isDeleted = !matchedShift
+
+        if (isDeleted) {
+            await calendar.events.delete({
+                calendarId: calendarId,
+                eventId: evt.id,
+            })
+        }
     }
- 
-
-
 
 }
 
@@ -271,20 +285,24 @@ async function getAccessToken(oAuth2Client) {
     const authCode = await readlineAskAsync('Enter the code from that page here: ')
 
     // get token from auth client
-    const token = await oAuth2Client.getToken(authCode)
-    
-    // Store the token to disk for later program executions
-    writeJsonAsync(config.paths.token, token)
+    const tokenResponse = await oAuth2Client.getToken(authCode)
+    if (tokenResponse.res.statusText != "OK") console.error("Could not retrieve token")
 
-    return token;
+    // Store the token to disk for later program executions
+    await writeJsonAsync(config.paths.token, tokenResponse.tokens)
+
+    return tokenResponse.tokens;
 }
 
 function readJsonAsync(filePath) {
     return new Promise(
         (resolve) => {
             fs.readFile(filePath, (err, content) => {
-                if (err) resolve({ err });
-                resolve({data: JSON.parse(content)})
+                if (err) {
+                    resolve({ err })
+                } else {
+                   resolve({data: JSON.parse(content)}) 
+                }
             })
        }
      );

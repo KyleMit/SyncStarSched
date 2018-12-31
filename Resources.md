@@ -36,6 +36,7 @@ Links and Learning
 
 * [Update Package Version](https://stackoverflow.com/q/16073603/1366033)
 * [Node Config Files](https://stackoverflow.com/a/14678694/1366033)
+* [Unable to read from console in node js using VS code](https://stackoverflow.com/q/36094026/1366033)
 
 ## Puppetteer
 
@@ -53,3 +54,4 @@ Links and Learning
 ### Moment
 
 * [Format](https://momentjs.com/docs/#/displaying/format/)
+* [Duration](https://stackoverflow.com/a/25150793/1366033)
