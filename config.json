@@ -1,0 +1,14 @@
+{
+    "scope": [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
+        "https://www.googleapis.com/auth/calendar"
+    ],
+    "paths" : {
+        "token": "token.json",
+        "creds": "credentials.json"
+    },
+    "urls": {
+        "starbucks": "https://mysite.starbucks.com/MySchedule/Schedule.aspx"
+    }
+}

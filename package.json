@@ -1,0 +1,13 @@
+{
+  "name": "automatebuckscal",
+  "version": "1.0.0",
+  "description": "Scrape Starbucks Shifts and Parse into Google Calendar",
+  "main": "index.js",
+  "scripts": {},
+  "author": "KyleMit",
+  "license": "MIT",
+  "dependencies": {
+    "googleapis": "^36.0.0",
+    "puppeteer": "^1.11.0"
+  }
+}
