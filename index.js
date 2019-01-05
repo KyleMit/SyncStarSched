@@ -6,6 +6,15 @@ const puppeteer = require('puppeteer');
 const config = require('./config.json');
 const secrets = require('./secrets.json');
 
+const colors = {
+    Black:  "\x1b[30m" + "%s" + "\x1b[0m",
+    White:  "\x1b[37m" + "%s" + "\x1b[0m",
+    Red:    "\x1b[31m" + "%s" + "\x1b[0m",
+    Green:  "\x1b[32m" + "%s" + "\x1b[0m",
+    Yellow: "\x1b[33m" + "%s" + "\x1b[0m",
+    Blue:   "\x1b[34m" + "%s" + "\x1b[0m",
+};
+
 // launch program with async iife
 (async () => {
 
@@ -14,7 +23,6 @@ const secrets = require('./secrets.json');
     const schedule = await scrapeSite()
 
     await syncSchedule(oAuth2Client, schedule)
-
 
 })()
 
@@ -118,10 +126,12 @@ async function scrapeSite() {
     //     "shiftEnd": "06:00 PM"
     // }
 
-    console.log(`Retrieved ${webShifts.length} shift(s) from Starbucks:`)
+    // log events for fun
+    console.log(colors.Yellow, `Retrieved ${webShifts.length} shift(s) from Starbucks:`)
     webShifts.forEach(shift => {
         console.log(`Shift: ${shift.day}, ${shift.shiftStart}`);
     });
+    console.log("\r\n")
 
     // Closing Time
     await browser.close();
@@ -170,13 +180,11 @@ async function syncSchedule(auth, schedule) {
     const upcomingEvents = eventsRes.data.items;
 
     // log events for fun
-    if (upcomingEvents.length) {
-        console.log(`Retrieved ${upcomingEvents.length} upcoming calendar appointment(s):`)
-        upcomingEvents.forEach(event => {
-            const start = event.start.dateTime || event.start.date;
-            console.log(`Event: ${start} - ${event.summary}`);
-        });
-    }
+    console.log(colors.Yellow, `Retrieved ${upcomingEvents.length} upcoming calendar appointment(s):`)
+    upcomingEvents.forEach(event => {
+        console.log(`Event: ${event.start.dateTime || event.start.date} - ${event.summary}`);
+    });
+    console.log("\r\n")
 
     const defaultEvent = {  
         'summary': 'Starbucks Shift',
@@ -200,7 +208,7 @@ async function syncSchedule(auth, schedule) {
         }
     }
 
-
+    // find new shifts
     for (let i=0; i < schedule.length; i++) {
         const shift = schedule[i];
 
@@ -221,7 +229,20 @@ async function syncSchedule(auth, schedule) {
 
         shift.isNew = !matchedEvent
 
-        if (shift.isNew) {
+        shift.inFuture = shift.startMoment > moment()
+
+        shift.shouldInsert = shift.isNew && shift.inFuture
+     
+    }
+    
+    // insert new shifts
+    var insertShifts = schedule.filter(s=> s.shouldInsert)
+    console.log(colors.Green, `Inserting ${insertShifts.length} new shift(s):`)
+
+    for (let i=0; i < schedule.length; i++) {
+        const shift = schedule[i];
+
+        if (shift.isNew && shift.inFuture) {
 
             let insertShift = Object.assign({}, defaultEvent)
             insertShift.start.dateTime = shift.startMoment.format()
@@ -234,11 +255,15 @@ async function syncSchedule(auth, schedule) {
                 requestBody: insertShift,
             })
 
+            console.log(`Inserted: ${shift.day}, ${shift.start}`);
             // todo - send update if requested
         }
     }
+    console.log("\r\n")
 
-    // todo: delete events
+
+
+    // find deleted events
     for (let i = 0; i < upcomingEvents.length; i++) {
         const evt = upcomingEvents[i];
         
@@ -247,14 +272,22 @@ async function syncSchedule(auth, schedule) {
                    moment(evt.end.dateTime).format() == shift.endMoment.format()
         })
 
-        const isDeleted = !matchedShift
+        evt.shouldDelete = !matchedShift
+    }
 
-        if (isDeleted) {
-            await calendar.events.delete({
-                calendarId: calendarId,
-                eventId: evt.id,
-            })
-        }
+
+    // delete events
+    var deleteShifts = upcomingEvents.filter(e=> e.shouldDelete)
+    console.log(colors.Red, `Deleting ${deleteShifts.length} removed event(s):`)
+    for (let i = 0; i < deleteShifts.length; i++) {
+        const evt = upcomingEvents[i];
+        
+        await calendar.events.delete({
+            calendarId: calendarId,
+            eventId: evt.id,
+        })
+
+        console.log(`Deleted: ${evt.start.dateTime}`);
     }
 
 }
