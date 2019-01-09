@@ -9,7 +9,14 @@
             "request": "launch",
             "name": "Launch Program",
             "program": "${workspaceFolder}\\index.js",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "${workspaceFolder}/nodeApp/node_modules/**/*.js",
+                "${workspaceFolder}/lib/**/*.js",
+                "<node_internals>/**/*.js",
+                "<node_internals>/**",
+                "<node_internals>/internal/async_hooks.js"
+            ],
         }
     ]
 }
