@@ -42,7 +42,7 @@ const defaultEvent = {
 // launch program with async iife
 (async () => {
 
-    //const schedule = await scrapeStarbucks()
+    const schedule = await scrapeStarbucks()
 
     const calendarApi = await getCalendarApi()
     
@@ -135,13 +135,6 @@ async function scrapeStarbucks() {
         shift.duration = moment.duration(shift.endMoment.diff(shift.startMoment));
     }     
 
-    // var sampleShift = {
-    //     "storeNumber": "007629",
-    //     "storeName": "Burlington Town Center",
-    //     "day": "Friday, January 11",
-    //     "shiftStart": "12:30 PM",
-    //     "shiftEnd": "06:00 PM"
-    // }
 
     // log events for fun
     console.log(colors.Yellow, `Retrieved ${webShifts.length} shift(s) from Starbucks:`)
@@ -182,7 +175,7 @@ async function getPageStatus(myPage) {
 async function getCalendarApi() {
     const oAuth2Client = await getOAuthClient()
     
-    const calendar = google.calendar({ version: 'v3', oAuth2Client });
+    const calendar = google.calendar({ version: 'v3', auth: oAuth2Client });
 
     return calendar
 }
@@ -271,6 +264,8 @@ try {
 
 async function syncSchedule(calendar, schedule, upcomingEvents) {
 
+    const calendarId = secrets.cal.id || await getCalendarId(calendar, secrets.cal.name)
+
     // find new shifts
     for (let i=0; i < schedule.length; i++) {
         const shift = schedule[i];
@@ -307,7 +302,6 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
         // todo - send update if requested
     }
     console.log("\r\n")
-
 
 
     // find deleted events
