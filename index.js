@@ -264,7 +264,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
 
     // find new shifts
     for (let i=0; i < schedule.length; i++) {
-        const shift = schedule[i];
+        let shift = schedule[i];
 
         var matchedEvent = upcomingEvents.some(evt => {
             return moment(evt.start.dateTime).format() == shift.startMoment.format() &&
@@ -281,7 +281,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
     console.log(colors.Green, `Inserting ${insertShifts.length} new shift(s):`)
 
     for (let i=0; i < insertShifts.length; i++) {
-        const shift = insertShifts[i];
+        let shift = insertShifts[i];
 
         let insertShift = Object.assign({}, defaultEvent)
         insertShift.start.dateTime = shift.startMoment.format()
@@ -302,7 +302,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
 
     // find deleted events
     for (let i = 0; i < upcomingEvents.length; i++) {
-        const evt = upcomingEvents[i];
+        let evt = upcomingEvents[i];
         
         var matchedShift = schedule.some(shift => {
             return moment(evt.start.dateTime).format() == shift.startMoment.format() &&
@@ -317,7 +317,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
     var deleteShifts = upcomingEvents.filter(e=> e.shouldDelete)
     console.log(colors.Red, `Deleting ${deleteShifts.length} removed event(s):`)
     for (let i = 0; i < deleteShifts.length; i++) {
-        const evt = upcomingEvents[i];
+        let evt = deleteShifts[i];
         
         await calendar.events.delete({
             calendarId: calendarId,
