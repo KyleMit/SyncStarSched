@@ -56,3 +56,8 @@ Links and Learning
 
 * [Format](https://momentjs.com/docs/#/displaying/format/)
 * [Duration](https://stackoverflow.com/a/25150793/1366033)
+
+### JavaScript
+
+* [Leading Zeros to Leading Space](https://regexr.com/46de6)
+* [Find and replace all chars in string](https://stackoverflow.com/q/1144783/1366033)

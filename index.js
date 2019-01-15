@@ -42,11 +42,11 @@ const defaultEvent = {
 // launch program with async iife
 (async () => {
 
-    const schedule = await scrapeStarbucks()
-
     const calendarApi = await getCalendarApi()
     
     const upcomingEvents = await getCalendarEvents(calendarApi)
+    
+    const schedule = await scrapeStarbucks()
 
     await syncSchedule(calendarApi, schedule, upcomingEvents)
 
@@ -140,7 +140,7 @@ async function scrapeStarbucks() {
     console.log(colors.Yellow, `Retrieved ${webShifts.length} shift(s) from Starbucks:`)
     webShifts.forEach(shift => {
         console.log(shift.startMoment > moment() ? colors.Bright : colors.White,
-                    `Shift: ${shift.startMoment.format("ddd, MMM D, h:mma")}`);
+                    `Shift: ${shift.startMoment.format("ddd, MMM DD, hh:mma")} to ${shift.endMoment.format("hh:mma")}`.replace(/\ 0/g, '  '));
     });
     console.log("\r\n")
 
@@ -240,14 +240,13 @@ async function getCalendarEvents(calendar) {
     // log events 
     console.log(colors.Yellow, `Retrieved ${upcomingEvents.length} upcoming calendar appointment(s):`)
     upcomingEvents.forEach(event => {
-        console.log(`Event: ${moment(event.start.dateTime).format("ddd, MMM D, h:mma")}`);
+        console.log(`Event: ${moment(event.start.dateTime).format("ddd, MMM DD, hh:mma")} to ${moment(event.end.dateTime).format("hh:mma")}`.replace(/\ 0/g, '  '));
     });
     console.log("\r\n")
 
     return upcomingEvents;
 }
 async function getCalendarId(calendar, calendarName) {
-try {
      // call all active calendars to look for this one
      const calRes = await calendar.calendarList.list({})
      const calendars = calRes.data.items;
@@ -255,9 +254,6 @@ try {
      const calendarId = myCal.id; // "60m640rj25mngq7m57j0hbg518@group.calendar.google.com"
  
      return calendarId;
-} catch (error) {
-    console.log(error)
-}
 
 }
 
@@ -298,7 +294,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
             requestBody: insertShift,
         })
 
-        console.log(`Inserted: ${shift.startMoment.format("ddd, MMM D, h:mma")}`);
+        console.log(`Inserted: ${shift.startMoment.format("ddd, MMM DD, hh:mma")} to ${shift.endMoment.format("hh:mma")}`.replace(/\ 0/g, '  '));
         // todo - send update if requested
     }
     console.log("\r\n")
@@ -328,7 +324,7 @@ async function syncSchedule(calendar, schedule, upcomingEvents) {
             eventId: evt.id,
         })
 
-        console.log(`Deleted: ${moment(evt.start.dateTime).format("ddd, MMM D, h:mma")}`);
+        console.log(`Deleted: ${moment(evt.start.dateTime).format("ddd, MMM DD, hh:mma")} to ${moment(evt.end.dateTime).format("hh:mma")}`.replace(/\ 0/g, '  '));
     }
 
 }
