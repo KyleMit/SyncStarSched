@@ -1,6 +1,7 @@
 secrets.json
 credentials.json
 token.json
+*.token.json
 
 # Logs
 logs
